@@ -1,0 +1,120 @@
+{
+    "AWSTemplateFormatVersion" : "2010-09-09",
+    "Description" : "Create infrastructure and a system running Kali linux",
+    "Parameters" : {
+        "EC2KeyParameter" : {
+            "Description" : "Enter the SSH key to be used to access the instance",
+            "Type" : "AWS::EC2::KeyPair::KeyName"
+        },
+        "SSHParameter" : {
+            "Description" : "Enter the IP address of the system administrating your EC2 systems",
+            "Type" : "String",
+            "Default" : "192.168.1.1/32"
+        },
+        "SGInboundCIDRParameter" : {
+            "Description" : "Optionally, enter a CIDR range to allow traffic FROM.  You can specify the sender-receiver IP or you can leave it as 0.0.0.0/0",
+            "Type" : "String",
+            "Default" : "0.0.0.0/0"
+        },
+        "SGOutboundCIDRParameter" : {
+            "Description" : "Optionally, enter a CIDR range to allow traffic FROM.  You can specify the reflector IP or you can leave it as 0.0.0.0/0",
+            "Type" : "String",
+            "Default" : "0.0.0.0/0"
+        },
+        "VPCCIDRParameter" : {
+            "Description" : "Optionally, enter a CIDR for the VPC (useful if making multiple VPCs)",
+            "Type" : "String",
+            "Default" : "10.0.0.0/16"
+        },
+        "SubnetParameter" : {
+            "Description" : "Optionally, enter a CIDR for the Subnet (useful if making multiple VPCs)",
+            "Type" : "String",
+            "Default" : "10.0.0.0/24"
+        }
+    },
+    "Resources" : {
+        "CreateVPC" : {
+            "Type" : "AWS::EC2::VPC",
+            "Properties" : {
+                "CidrBlock" : { "Ref" : "VPCCIDRParameter" },
+                "InstanceTenancy" : "default",
+                "Tags" : [ {"Key" : "stack", "Value" : { "Ref" : "AWS::StackName"} } ]
+            }
+        },
+        "CreateIGW" : {
+            "Type" : "AWS::EC2::InternetGateway",
+            "Properties" : {
+                "Tags" : [ { "Key" : "stack", "Value" : { "Ref" : "AWS::StackName"} } ]
+            }
+        },
+        "CreateSubnet" : {
+            "Type" : "AWS::EC2::Subnet",
+            "DependsOn" : "CreateVPC",
+            "Properties" : {
+                "CidrBlock" : { "Ref" : "SubnetParameter" },
+                "MapPublicIpOnLaunch" : "true",
+                "VpcId" : { "Ref" : "CreateVPC" },
+                "Tags" : [ {"Key" : "stack", "Value" : { "Ref" : "AWS::StackName"} } ]
+            }
+        },
+        "CreateRouteTable" : {
+            "Type" : "AWS::EC2::RouteTable",
+            "DependsOn" : ["CreateVPC", "CreateSubnet"],
+            "Properties" : {
+                "VpcId" : {"Ref" : "CreateVPC"},
+                "Tags" : [ {"Key" : "stack", "Value" : { "Ref" : "AWS::StackName"} } ]
+            }
+        },
+        "CreateRoute" : { 
+            "Type" : "AWS::EC2::Route",
+            "DependsOn" : "CreateRouteTable",
+            "Properties" : {
+                "DestinationCidrBlock" : "0.0.0.0/0",
+                "GatewayId" : { "Ref" : "CreateIGW"},
+                "RouteTableId" : {"Ref" : "CreateRouteTable"}
+                }
+        },
+        "AttachIGW" : {
+            "Type" : "AWS::EC2::VPCGatewayAttachment",
+            "DependsOn" : "CreateVPC",
+            "Properties" : {
+                "VpcId" : { "Ref" : "CreateVPC" },
+                "InternetGatewayId" : { "Ref" : "CreateIGW"}
+            }
+        },
+        "AttachRouteTable" : {
+            "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+            "DependsOn" : ["CreateRouteTable", "CreateSubnet"],
+            "Properties" : {
+                "RouteTableId" : { "Ref" : "CreateRouteTable" },
+                "SubnetId" : {"Ref" : "CreateSubnet" }
+              }
+          },
+        "SGKali" : {
+            "Type" : "AWS::EC2::SecurityGroup",
+            "DependsOn" : "CreateVPC",
+            "Properties" : {
+                "GroupName" : "Administration",
+                "GroupDescription" : "Basic SG for allowing SSH",
+                "SecurityGroupEgress" : [],
+                "SecurityGroupIngress" : [ 
+                    { "CidrIp" : { "Ref" : "SSHParameter" }, "Description" : "SSH from single host", "IpProtocol" : "tcp" ,"FromPort" : 22, "ToPort" : 22}
+                ],
+                "VpcId" : {"Ref" : "CreateVPC"},
+                "Tags" : [ {"Key" : "stack", "Value" : { "Ref" : "AWS::StackName"} }, {"Key" : "Name", "Value" : "SSHandRSVPOutbound_SSHInbound"} ]
+              }
+          },
+        "CreateKali" : {
+            "Type" : "AWS::EC2::Instance",
+            "DependsOn" : ["SGKali", "CreateSubnet"],
+            "Properties" : {
+                "ImageId" : "ami-0c11557d0e4e9c896",
+                "InstanceType" : "t2.micro",
+                "KeyName" : {"Ref" : "EC2KeyParameter"},
+                "SubnetId" : {"Ref" : "CreateSubnet"},
+                "SecurityGroupIds" : [{ "Fn::GetAtt" : ["SGKali", "GroupId"] }],
+                "Tags" : [ {"Key" : "stack", "Value" : { "Ref" : "AWS::StackName"} }, {"Key" : "Name", "Value" : "kali"}  ]
+            }
+        }
+    }
+}
