@@ -108,8 +108,8 @@
             "Type" : "AWS::EC2::Instance",
             "DependsOn" : ["SGKali", "CreateSubnet"],
             "Properties" : {
-                "ImageId" : "ami-0c11557d0e4e9c896",
-                "InstanceType" : "t2.micro",
+                "ImageId" : "ami-06e9ed0799116d0dd",
+                "InstanceType" : "t2.medium",
                 "KeyName" : {"Ref" : "EC2KeyParameter"},
                 "SubnetId" : {"Ref" : "CreateSubnet"},
                 "SecurityGroupIds" : [{ "Fn::GetAtt" : ["SGKali", "GroupId"] }],
