@@ -108,6 +108,14 @@
             "Type" : "AWS::EC2::Instance",
             "DependsOn" : ["SGKali", "CreateSubnet"],
             "Properties" : {
+            	"BlockDeviceMappings" : [
+         		{
+           		"DeviceName" : "/dev/sda1",
+              	"Ebs" : {
+              		"VolumeSize" : "80"
+               		}
+		         }
+		      ],
                 "ImageId" : "ami-06e9ed0799116d0dd",
                 "InstanceType" : "t2.medium",
                 "KeyName" : {"Ref" : "EC2KeyParameter"},
